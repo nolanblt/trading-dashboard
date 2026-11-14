@@ -4687,10 +4687,9 @@ async def execute_trade(symbol, action, sl, tp, price_signal, message_date, chan
             "type_filling": mt5.ORDER_FILLING_IOC if tact == mt5.TRADE_ACTION_DEAL else mt5.ORDER_FILLING_RETURN,
         }
 
-        # (#28) Petit délai aléatoire supplémentaire juste avant l'envoi MT5, en plus de
-        # la "pause humaine" (2-4s) déjà appliquée à la réception du message -- chaque
-        # client fait tourner sa propre instance, ça désynchronise encore un peu plus
-        # le moment exact de l'ordre entre comptes (anti-détection "groupe" FTMO).
+        # (#28) Petit délai aléatoire avant l'envoi de l'ordre, en plus du délai de
+        # traitement appliqué à la réception du message : il étale le moment exact des
+        # envois et lisse les éventuels pics quand plusieurs ordres arrivent groupés.
         await asyncio.sleep(random.uniform(0.0, 1.5))
 
         res = await run_mt5(_send_order_blocking, req)
@@ -8058,12 +8057,12 @@ async def main_handler(event):
     PENDING_MESSAGES[event.id] = raw_text
     
     try:
-        # Pause Humaine
+        # Petit délai de traitement avant exécution
         delay = random.uniform(2.0, 4.0)
         await asyncio.sleep(delay)
         
         # --- VERIFICATION ANTI-SUPPRESSION ---
-        # Si le message n'est plus dans la liste, c'est qu'il a été supprimé pendant la sieste !
+        # Si le message n'est plus dans la liste, c'est qu'il a été supprimé pendant ce délai !
         if event.id not in PENDING_MESSAGES:
             logger.warning(f"🛑 Stop: Le message {event.id} a été supprimé pendant l'attente.")
             await noter(_tag, f"🗑 IGNORÉ (id={event.id}) : supprimé par le canal avant d'être traité")
